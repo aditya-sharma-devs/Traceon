@@ -7,6 +7,7 @@ import Repository from "@/lib/db/models/Repository";
 import AnalysisResult from "@/lib/db/models/AnalysisResult";
 import bcrypt from "bcryptjs";
 import { uploadAvatar } from "@/lib/blob";
+import { ProfileAnalysis } from "@/lib/db/models/ProfileAnalysis";
 
 
 export const maxDuration = 60;
@@ -217,6 +218,18 @@ export async function DELETE() {
 
     // 4. Delete the user
     await User.deleteOne({ _id: user._id });
+
+    // 5. Delete ProfileAnalysis — kept separate so a failure here does not
+    //    block account deletion. GDPR: no PII should remain after deletion.
+    try {
+      await ProfileAnalysis.deleteOne({ userId: user._id });
+    } catch (profileAnalysisError) {
+      console.error(
+        "[Account Deletion] Failed to delete ProfileAnalysis for user:",
+        user.githubUsername,
+        profileAnalysisError
+      );
+    }
 
     return NextResponse.json({ message: "Account deleted successfully" });
   } catch (error) {
