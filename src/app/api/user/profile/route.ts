@@ -7,7 +7,10 @@ import Repository from "@/lib/db/models/Repository";
 import AnalysisResult from "@/lib/db/models/AnalysisResult";
 import bcrypt from "bcryptjs";
 import { uploadAvatar } from "@/lib/blob";
+import { ProfileAnalysis } from "@/lib/db/models/ProfileAnalysis";
 
+
+export const maxDuration = 60;
 // ─── GET: Fetch user profile and stats ───────────────────────────
 export async function GET() {
   try {
@@ -111,26 +114,29 @@ export async function POST(req: Request) {
 
     // Image update (base64 or URL)
     if (image !== undefined) {
+      if (typeof image !== "string") {
+        return NextResponse.json(
+          { message: "Invalid image format" },
+          { status: 400 },
+        );
+      }
+
+      const imageSizeBytes = Buffer.byteLength(image, "utf8");
+
+      if (imageSizeBytes > 8 * 1024 * 1024) {
+        return NextResponse.json(
+          { message: "Image must be under 5MB." },
+          { status: 413 },
+        );
+      }
+
       if (image === "") {
         user.image = undefined;
-      } else {
-        if (typeof image !== "string" || !image.startsWith("data:image/")) {
-          return NextResponse.json(
-            { message: "Invalid image format" },
-            { status: 400 },
-          );
-        }
-
-        if (image.length > 7 * 1024 * 1024) {
-          return NextResponse.json(
-            { message: "Image too large" },
-            { status: 400 },
-          );
-        }
-
+      } else if (image.startsWith("data:image/")) {
         const imageUrl = await uploadAvatar(image, user._id.toString());
-
         user.image = imageUrl;
+      } else {
+        user.image = image;
       }
     }
 
@@ -212,6 +218,18 @@ export async function DELETE() {
 
     // 4. Delete the user
     await User.deleteOne({ _id: user._id });
+
+    // 5. Delete ProfileAnalysis — kept separate so a failure here does not
+    //    block account deletion. GDPR: no PII should remain after deletion.
+    try {
+      await ProfileAnalysis.deleteOne({ userId: user._id });
+    } catch (profileAnalysisError) {
+      console.error(
+        "[Account Deletion] Failed to delete ProfileAnalysis for user:",
+        user.githubUsername,
+        profileAnalysisError
+      );
+    }
 
     return NextResponse.json({ message: "Account deleted successfully" });
   } catch (error) {
