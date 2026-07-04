@@ -111,37 +111,31 @@ export async function POST(req: Request) {
       user.name = name.trim();
     }
 
-        // Image update (base64 or URL)
-        if (image !== undefined) {
-    if (typeof image !== 'string') {
+    // Image update (base64 or URL)
+    if (image !== undefined) {
+      if (typeof image !== "string") {
         return NextResponse.json(
-            { message: 'Invalid image format' },
-            { status: 400 }
+          { message: "Invalid image format" },
+          { status: 400 },
         );
-    }
+      }
 
-    const imageSizeBytes = Buffer.byteLength(image, 'utf8');
+      const imageSizeBytes = Buffer.byteLength(image, "utf8");
 
-    if (imageSizeBytes > 8 * 1024 * 1024) {
+      if (imageSizeBytes > 8 * 1024 * 1024) {
         return NextResponse.json(
-            { message: 'Image must be under 5MB.' },
-            { status: 413 }
+          { message: "Image must be under 5MB." },
+          { status: 413 },
         );
-    }
+      }
 
-    user.image = image === '' ? undefined : image;
-}
-
-        if (image.length > 7 * 1024 * 1024) {
-          return NextResponse.json(
-            { message: "Image too large" },
-            { status: 400 },
-          );
-        }
-
+      if (image === "") {
+        user.image = undefined;
+      } else if (image.startsWith("data:image/")) {
         const imageUrl = await uploadAvatar(image, user._id.toString());
-
         user.image = imageUrl;
+      } else {
+        user.image = image;
       }
     }
 
