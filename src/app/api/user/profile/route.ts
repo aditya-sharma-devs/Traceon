@@ -8,6 +8,8 @@ import AnalysisResult from "@/lib/db/models/AnalysisResult";
 import bcrypt from "bcryptjs";
 import { uploadAvatar } from "@/lib/blob";
 
+
+export const maxDuration = 60;
 // ─── GET: Fetch user profile and stats ───────────────────────────
 export async function GET() {
   try {
@@ -109,17 +111,26 @@ export async function POST(req: Request) {
       user.name = name.trim();
     }
 
-    // Image update (base64 or URL)
-    if (image !== undefined) {
-      if (image === "") {
-        user.image = undefined;
-      } else {
-        if (typeof image !== "string" || !image.startsWith("data:image/")) {
-          return NextResponse.json(
-            { message: "Invalid image format" },
-            { status: 400 },
-          );
-        }
+        // Image update (base64 or URL)
+        if (image !== undefined) {
+    if (typeof image !== 'string') {
+        return NextResponse.json(
+            { message: 'Invalid image format' },
+            { status: 400 }
+        );
+    }
+
+    const imageSizeBytes = Buffer.byteLength(image, 'utf8');
+
+    if (imageSizeBytes > 8 * 1024 * 1024) {
+        return NextResponse.json(
+            { message: 'Image must be under 5MB.' },
+            { status: 413 }
+        );
+    }
+
+    user.image = image === '' ? undefined : image;
+}
 
         if (image.length > 7 * 1024 * 1024) {
           return NextResponse.json(
